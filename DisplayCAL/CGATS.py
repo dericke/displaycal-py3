@@ -41,10 +41,7 @@ def rpad(value, width) -> bytes:
     Otherwise, return string in decimal notation right-padded to given width
     (using trailing zeros).
     """
-    strval = b""
-    if not isinstance(value, bytes):
-        strval = bytes(str(value), "UTF-8")
-
+    strval = b"" if isinstance(value, bytes) else bytes(str(value), "UTF-8")
     if not isinstance(value, (int, float, complex)):
         # Return quoted string representation
         # Also need to escape single quote -> double quote
@@ -63,20 +60,15 @@ def rpad(value, width) -> bytes:
 
 
 def sort_RGB_gray_to_top(a, b):
-    if a[0] == a[1] == a[2]:
-        if b[0] == b[1] == b[2]:
-            return 0
-        return -1
-    else:
+    if not a[0] == a[1] == a[2]:
         return 0
+    return 0 if b[0] == b[1] == b[2] else -1
 
 
 def sort_RGB_to_top_factory(i1, i2, i3, i4):
     def sort_RGB_to_top(a, b):
         if a[i1] == a[i2] and 0 <= a[i3] < a[i4]:
-            if b[i1] == b[i2] and 0 <= b[i3] < b[i4]:
-                return 0
-            return -1
+            return 0 if b[i1] == b[i2] and 0 <= b[i3] < b[i4] else -1
         else:
             return 0
 

@@ -19,37 +19,15 @@ TIFF_TAG_TYPE_RATIONAL = 5  # 2 DWORDs
 
 
 def tiff_get_header(w, h, samples_per_pixel, bitdepth):
-    # Very helpful: http://www.fileformat.info/format/tiff/corion.htm
-
-    header = []
-    header.append(b"MM\0*")  # Note: We use big-endian byte order
-
-    # Offset of image directory
-    header.append(b"\0\0\0\x08")
-
     pixelcount = w * h * samples_per_pixel
-    if bitdepth == 16:
-        bytecount = pixelcount * 2
-    else:
-        bytecount = pixelcount
-
+    bytecount = pixelcount * 2 if bitdepth == 16 else pixelcount
     # Image file directory (IFD)
 
     # PhotometricInterpretation
-    if samples_per_pixel == 3:
-        pmi = 2  # RGB
-    else:
-        pmi = 5  # Separated (usually CMYK)
-
+    pmi = 2 if samples_per_pixel == 3 else 5
     # Tag, type, length, offset or data, is data (otherwise offset)
-    if w > 65535:
-        tag_type_w = TIFF_TAG_TYPE_DWORD
-    else:
-        tag_type_w = TIFF_TAG_TYPE_WORD
-    if h > 65535:
-        tag_type_h = TIFF_TAG_TYPE_DWORD
-    else:
-        tag_type_h = TIFF_TAG_TYPE_WORD
+    tag_type_w = TIFF_TAG_TYPE_DWORD if w > 65535 else TIFF_TAG_TYPE_WORD
+    tag_type_h = TIFF_TAG_TYPE_DWORD if h > 65535 else TIFF_TAG_TYPE_WORD
     ifd = [
         (0x100, tag_type_w, 1, w, True),  # ImageWidth
         (0x101, tag_type_h, 1, h, True),  # ImageLength
@@ -64,27 +42,22 @@ def tiff_get_header(w, h, samples_per_pixel, bitdepth):
 
     ifd.sort()  # Must be ascending order!
 
-    header.append(struct.pack(">H", len(ifd)))  # Number of entries
-
+    header = [b"MM\0*", b"\0\0\0\x08", struct.pack(">H", len(ifd))]
     for tag, tagtype, length, payload, is_data in ifd:
-        header.append(struct.pack(">H", tag))
-        header.append(struct.pack(">H", tagtype))
-        header.append(struct.pack(">I", length))
+        header.extend(
+            (
+                struct.pack(">H", tag),
+                struct.pack(">H", tagtype),
+                struct.pack(">I", length),
+            )
+        )
+
         if is_data and tagtype == 3:
-            # A word left-aligned in a dword
-            header.append(struct.pack(">H", payload))
-            header.append(b"\0\0")
+            header.extend((struct.pack(">H", payload), b"\0\0"))
         else:
             header.append(struct.pack(">I", payload))
 
-    # PlanarConfiguration default is 1 = RGBRGBRGB...
-
-    # End of IFD
-    header.append(b"\0" * 4)
-
-    # BitsPerSample (6 bytes)
-    header.append(struct.pack(">H", bitdepth) * 3)
-
+    header.extend((b"\0" * 4, struct.pack(">H", bitdepth) * 3))
     return b"".join(header)
 
 
@@ -191,10 +164,7 @@ class Image(object):
         tzoffset = round(
             (time.mktime(time.localtime()) - time.mktime(time.gmtime())) / 60.0 / 60.0
         )
-        if tzoffset < 0:
-            tzoffset = b"%.2i" % tzoffset
-        else:
-            tzoffset = b"+%.2i" % tzoffset
+        tzoffset = b"%.2i" % tzoffset if tzoffset < 0 else b"+%.2i" % tzoffset
         stream.write(
             time.strftime("%Y:%m:%d:%H:%M:%S").encode() + tzoffset.encode() + b"\0\0"
         )
@@ -239,9 +209,10 @@ class Image(object):
 
         # Generic image source header (256 bytes)
         sw, sh = [
-            self.extrainfo.get("original_" + dim, locals()[dim[0]])
+            self.extrainfo.get(f"original_{dim}", locals()[dim[0]])
             for dim in ("width", "height")
         ]
+
         # X offset
         stream.write(struct.pack(">I", self.extrainfo.get("offset_x", (sw - w) / 2)))
         # Y offset
@@ -330,32 +301,29 @@ class Image(object):
         stream.write(b"\x89PNG\r\n\x1a\n")
         # IHDR image header length
         stream.write(struct.pack(">I", 13))
-        # IHDR image header chunk type
-        ihdr = [b"IHDR"]
         # Optimize for single color
         optimize = len(self.data) == 1 and len(self.data[0]) == 1 and dimensions
         # IHDR: width, height
-        if optimize:
-            w, h = dimensions
-        else:
-            w, h = len(self.data[0]), len(self.data)
-        ihdr.extend([struct.pack(">I", w), struct.pack(">I", h)])
-        # IHDR: Bit depth
-        ihdr.append(self.bitdepth.to_bytes(1, "big"))
-        # IHDR: Color type 2 (truecolor)
-        ihdr.append(b"\2")
-        # IHDR: Compression method 0 (deflate)
-        ihdr.append(b"\0")
-        # IHDR: Filter method 0 (adaptive)
-        ihdr.append(b"\0")
-        # IHDR: Interlace method 0 (none)
-        ihdr.append(b"\0")
+        w, h = dimensions if optimize else (len(self.data[0]), len(self.data))
+        ihdr = [
+            b"IHDR",
+            *[
+                struct.pack(">I", w),
+                struct.pack(">I", h),
+                self.bitdepth.to_bytes(1, "big"),
+                b"\2",
+                b"\0",
+                b"\0",
+                b"\0",
+            ],
+        ]
+
         ihdr = b"".join(ihdr)
         stream.write(ihdr)
         stream.write(struct.pack(">I", zlib.crc32(ihdr) & 0xFFFFFFFF))
         # IDAT image data chunk type
         imgdata = []
-        for _i, scanline in enumerate(self.data):
+        for scanline in self.data:
             # Add a scanline, filter type 0
             imgdata.append(b"\0")
             for RGB in scanline:
@@ -368,8 +336,7 @@ class Image(object):
             imgdata *= dimensions[1]
         imgdata = zlib.compress(imgdata, 9)
         stream.write(struct.pack(">I", len(imgdata)))
-        idat = [b"IDAT"]
-        idat.append(imgdata)
+        idat = [b"IDAT", imgdata]
         idat = b"".join(idat)
         stream.write(idat)
         stream.write(struct.pack(">I", zlib.crc32(idat) & 0xFFFFFFFF))
@@ -398,7 +365,7 @@ class Image(object):
         stream.write(tiff_get_header(w, h, samples_per_pixel, self.bitdepth))
 
         # Write image data
-        for _i, scanline in enumerate(imgdata):
+        for scanline in imgdata:
             for sample in scanline:
                 stream.write(b"".join(self._pack(v) for v in sample))
 
@@ -410,11 +377,11 @@ class Image(object):
                     format += "F"
             else:
                 format = "PNG"
-        if not hasattr(self, "_write_" + format.lower()):
+        if not hasattr(self, f"_write_{format.lower()}"):
             raise ValueError("Unsupported format: %r" % format)
         if isinstance(stream_or_filename, str):
             stream = open(stream_or_filename, "wb")
         else:
             stream = stream_or_filename
         with stream:
-            getattr(self, "_write_" + format.lower())(stream, dimensions)
+            getattr(self, f"_write_{format.lower()}")(stream, dimensions)

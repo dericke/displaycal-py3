@@ -16,15 +16,12 @@ if sys.platform == "darwin":
     if platform.architecture()[0].startswith("64"):
         # TODO: Intel vs ARM (Apple Silicon) distinction
         from DisplayCAL.lib64.RealDisplaySizeMM import *
-else:
-    # elif sys.platform == "win32":
-    # Windows have separate files
-    if sys.version_info[:2] == (3, 8):
-        from DisplayCAL.lib64.python38.RealDisplaySizeMM import *
-    elif sys.version_info[:2] == (3, 9):
-        from DisplayCAL.lib64.python39.RealDisplaySizeMM import *
-    elif sys.version_info[:2] == (3, 10):
-        from DisplayCAL.lib64.python310.RealDisplaySizeMM import *
+elif sys.version_info[:2] == (3, 8):
+    from DisplayCAL.lib64.python38.RealDisplaySizeMM import *
+elif sys.version_info[:2] == (3, 9):
+    from DisplayCAL.lib64.python39.RealDisplaySizeMM import *
+elif sys.version_info[:2] == (3, 10):
+    from DisplayCAL.lib64.python310.RealDisplaySizeMM import *
 # else:
 #     pass
 
@@ -56,10 +53,7 @@ def GetXRandROutputXID(display_no=0):
     Returns:
         dict:
     """
-    display = get_display(display_no)
-    if display:
-        return display.get("output", 0)
-    return 0
+    return display.get("output", 0) if (display := get_display(display_no)) else 0
 
 
 def RealDisplaySizeMM(display_no=0):
@@ -81,8 +75,7 @@ def enumerate_displays():
     global _displays
     _displays = _enumerate_displays()
     for display in _displays:
-        desc = display["description"]
-        if desc:
+        if desc := display["description"]:
             match = re.findall(
                 rb"(.+?),? at (-?\d+), (-?\d+), width (\d+), height (\d+)", desc
             )
@@ -94,13 +87,12 @@ def enumerate_displays():
                         and "size" in display
                     ):
                         x, y, w, h = display["pos"] + display["size"]
-                        wayland_display = get_wayland_display(x, y, w, h)
-                        if wayland_display:
+                        if wayland_display := get_wayland_display(x, y, w, h):
                             display.update(wayland_display)
-                    else:
-                        xrandr_name = re.search(rb", Output (.+)", match[0][0])
-                        if xrandr_name:
-                            display["xrandr_name"] = xrandr_name.group(1)
+                    elif xrandr_name := re.search(
+                        rb", Output (.+)", match[0][0]
+                    ):
+                        display["xrandr_name"] = xrandr_name[1]
                 desc = b"%s @ %s, %s, %sx%s" % match[0]
                 display["description"] = desc
     return _displays
@@ -180,9 +172,7 @@ def get_wayland_display(x, y, w, h):
                 properties = output_storage[7]
                 wayland_display = {"xrandr_name": output_storage[4]}
                 raw_edid = properties.get("edid", ())
-                edid = b"".join(v.to_bytes(1, "big") for v in raw_edid)
-
-                if edid:
+                if edid := b"".join(v.to_bytes(1, "big") for v in raw_edid):
                     wayland_display["edid"] = edid
                 w_mm = properties.get("width-mm")
                 h_mm = properties.get("height-mm")

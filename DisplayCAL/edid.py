@@ -214,12 +214,9 @@ def get_edid(display_no=0, display_name=None, device=None):
                         return parsed_edid
         return {}
     elif RDSMM:
-        display = RDSMM.get_display(display_no)
-        if display:
+        if display := RDSMM.get_display(display_no):
             edid = display.get("edid")
-    if edid and len(edid) >= 128:
-        return parse_edid(edid)
-    return {}
+    return parse_edid(edid) if edid and len(edid) >= 128 else {}
 
 
 def parse_manufacturer_id(block):
@@ -228,9 +225,10 @@ def parse_manufacturer_id(block):
     The range is always ASCII charcode 64 to 95.
     """
     h = combine_hi_8lo(block[0], block[1])
-    manufacturer_id = []
-    for shift in (10, 5, 0):
-        manufacturer_id.append(chr(((h >> shift) & 0x1F) + ord("A") - 1))
+    manufacturer_id = [
+        chr(((h >> shift) & 0x1F) + ord("A") - 1) for shift in (10, 5, 0)
+    ]
+
     return "".join(manufacturer_id).strip()
 
 
@@ -312,18 +310,17 @@ def edid_get_bits(value, begin, end):
 def edid_decode_fraction(high, low):
     result = 0.0
     high = (high << 2) | low
-    for i in range(0, 10):
+    for i in range(10):
         result += edid_get_bit(high, i) * math.pow(2, i - 10)
     return result
 
 
 def edid_parse_string(desc):
-    # Return value should match colord's cd_edid_parse_string in cd-edid.c
-    # Remember: In C, NULL terminates a string, so do the same here
-    # Replace newline with NULL, then strip anything after first NULL byte
-    # (if any), then strip trailing whitespace
-    desc = strtr(desc[:13], {b"\n": b"\x00", b"\r": b"\x00"}).split(b"\x00")[0].rstrip()
-    if desc:
+    if (
+        desc := strtr(desc[:13], {b"\n": b"\x00", b"\r": b"\x00"})
+        .split(b"\x00")[0]
+        .rstrip()
+    ):
         # Replace all non-printable chars with NULL
         # Afterwards, the amount of NULL bytes is the number of replaced chars
         desc = make_ascii_printable(desc, substitute=b"\x00")
@@ -353,8 +350,7 @@ def parse_edid(edid):
             edid[MANUFACTURER_ID[0] : MANUFACTURER_ID[1]]
         ),
     }
-    manufacturer = get_manufacturer_name(result["manufacturer_id"])
-    if manufacturer:
+    if manufacturer := get_manufacturer_name(result["manufacturer_id"]):
         result["manufacturer"] = manufacturer
 
     result["product_id"] = struct.unpack("<H", edid[PRODUCT_ID[0] : PRODUCT_ID[1]])[0]
@@ -409,8 +405,7 @@ def parse_edid(edid):
         if block[:BLOCK_TYPE] != b"\x00\x00\x00":
             # Ignore pixel clock data
             continue
-        text_type = text_types.get(block[BLOCK_TYPE : BLOCK_TYPE + 1])
-        if text_type:
+        if text_type := text_types.get(block[BLOCK_TYPE : BLOCK_TYPE + 1]):
             desc = edid_parse_string(block[BLOCK_CONTENTS[0] : BLOCK_CONTENTS[1]])
             if desc is not None:
                 result[text_type] = desc.decode("utf-8")
@@ -423,18 +418,18 @@ def parse_edid(edid):
                     white_x = edid_decode_fraction(
                         edid[i + 2], edid_get_bits(edid[i + 1], 2, 3)
                     )
-                    result["white_x_" + str(block[i])] = white_x
+                    result[f"white_x_{str(block[i])}"] = white_x
                     if not result.get("white_x"):
                         result["white_x"] = white_x
                     white_y = edid_decode_fraction(
                         edid[i + 3], edid_get_bits(edid[i + 1], 0, 1)
                     )
-                    result["white_y_" + str(block[i])] = white_y
+                    result[f"white_y_{str(block[i])}"] = white_y
                     if not result.get("white_y"):
                         result["white_y"] = white_y
                     if block[i + 4] != "\xff":
                         gamma = block[i + 4] / 100.0 + 1
-                        result["gamma_" + str(block[i])] = gamma
+                        result[f"gamma_{str(block[i])}"] = gamma
                         if not result.get("gamma"):
                             result["gamma"] = gamma
         elif block[BLOCK_TYPE] == BLOCK_TYPE_COLOR_MANAGEMENT_DATA:
@@ -445,16 +440,12 @@ def parse_edid(edid):
 
     result["ext_flag"] = edid[EXTENSION_FLAG]
     result["checksum"] = edid[CHECKSUM]
-    result["checksum_valid"] = sum(char for char in edid) % 256 == 0
+    result["checksum_valid"] = sum(edid) % 256 == 0
 
     if len(edid) > 128 and result["ext_flag"] > 0:
         # Parse extension blocks
         block = edid[128:]
         while block:
-            if block[0] == BLOCK_DI_EXT:
-                if block[TRC[0]] != "\0":
-                    # TODO: Implement
-                    pass
             block = block[128:]
 
     return result

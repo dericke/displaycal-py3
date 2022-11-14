@@ -82,9 +82,9 @@ def convert_devicecorrections_to_ccmx(path, target_dir):
         values = {
             "DateTime": time.strftime("%a %b %d %H:%M:%S %Y"),
             "Originator": "Quato iColorDisplay",
-            "Name": "%s & %s"
-            % (devcorrection.get("Device"), devcorrection.get("Display")),
+            "Name": f'{devcorrection.get("Device")} & {devcorrection.get("Display")}',
         }
+
         for key in ("Device", "Display", "ReferenceDevice", "MatrixXYZ"):
             value = devcorrection.get(key)
             if value is None:
@@ -94,14 +94,18 @@ def convert_devicecorrections_to_ccmx(path, target_dir):
                 # purposes (see format example above).
                 matrix = value.split()[3:]
                 value = "\n".join(
-                    [" ".join(part) for part in (matrix[0:3], matrix[3:6], matrix[6:9])]
+                    [
+                        " ".join(part)
+                        for part in (matrix[:3], matrix[3:6], matrix[6:9])
+                    ]
                 )
+
             values[key] = value
         if value is None:
             skipped += 1
             continue
         imported += 1
-        with codecs.open(os.path.join(target_dir, name + ".ccmx"), "w", "utf8") as ccmx:
+        with codecs.open(os.path.join(target_dir, f"{name}.ccmx"), "w", "utf8") as ccmx:
             ccmx.write(CCMX_TEMPLATE % values)
     return imported, skipped
 

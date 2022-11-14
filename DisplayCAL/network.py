@@ -39,7 +39,7 @@ def get_valid_host(hostname=None):
     if hostname.endswith(".local"):
         hostnames.insert(0, os.path.splitext(hostname)[0])
     elif "." not in hostname:
-        hostnames.insert(0, hostname + ".local")
+        hostnames.insert(0, f"{hostname}.local")
     while hostnames:
         hostname = hostnames.pop()
         try:

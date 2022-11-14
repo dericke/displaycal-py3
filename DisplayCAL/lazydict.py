@@ -163,37 +163,38 @@ class LazyDict(dict):
         return dict.keys(self)
 
     def load(self, path=None, encoding=None, errors=None, raise_exceptions=False):
-        if not self._isloaded and (path or self.path):
-            self._isloaded = True
-            if not path:
-                path = self.path
-            if path and not os.path.isabs(path):
-                path = get_data_path(path)
-            if path and os.path.isfile(path):
-                self.path = path
-                if encoding:
-                    self.encoding = encoding
-                if errors:
-                    self.errors = errors
-            else:
-                handle_error(
-                    UserWarning("Warning - file not found:\n\n%s" % path), tb=False
-                )
-                return
-            try:
-                with codecs.open(path, "r", self.encoding, self.errors) as f:
-                    self.parse(f)
-            except EnvironmentError as exception:
-                if raise_exceptions:
-                    raise
-                handle_error(exception)
-            except Exception as exception:
-                if raise_exceptions:
-                    raise
-                handle_error(
-                    UserWarning("Error parsing file:\n\n%s\n\n%s" % (path, exception)),
-                    tb=False,
-                )
+        if self._isloaded or not path and not self.path:
+            return
+        self._isloaded = True
+        if not path:
+            path = self.path
+        if path and not os.path.isabs(path):
+            path = get_data_path(path)
+        if path and os.path.isfile(path):
+            self.path = path
+            if encoding:
+                self.encoding = encoding
+            if errors:
+                self.errors = errors
+        else:
+            handle_error(
+                UserWarning("Warning - file not found:\n\n%s" % path), tb=False
+            )
+            return
+        try:
+            with codecs.open(path, "r", self.encoding, self.errors) as f:
+                self.parse(f)
+        except EnvironmentError as exception:
+            if raise_exceptions:
+                raise
+            handle_error(exception)
+        except Exception as exception:
+            if raise_exceptions:
+                raise
+            handle_error(
+                UserWarning("Error parsing file:\n\n%s\n\n%s" % (path, exception)),
+                tb=False,
+            )
 
     def parse(self, iterable):
         # Override this in subclass
@@ -321,13 +322,13 @@ class LazyDict_YAML_UltraLite(LazyDict):
                     value = [self._unquote(token, True, True, fileobj, i)]
                 else:
                     value = []
-            else:
-                if not block:
-                    raise ValueError(
-                        "Unsupported format (%r line %i)"
-                        % (safe_str(getattr(fileobj, "name", line)), i)
-                    )
+            elif block:
                 value.append(line[2:])
+            else:
+                raise ValueError(
+                    "Unsupported format (%r line %i)"
+                    % (safe_str(getattr(fileobj, "name", line)), i)
+                )
         if key:
             self[key] = "".join(value).rstrip("\n")
 
@@ -425,13 +426,12 @@ class LazyDict_YAML_Lite(LazyDict_YAML_UltraLite):
                         "scalar (%r line %i)"
                         % (safe_str(getattr(fileobj, "name", line)), i)
                     )
-                else:
-                    if self.debug:
-                        print("START QUOTE")
-                    quote = line_lwstrip[0]
-                    if self.debug:
-                        print("+ APPEND LWSTRIPPED", repr(line_lwstrip))
-                    value.append(line_lwstrip)
+                if self.debug:
+                    print("START QUOTE")
+                quote = line_lwstrip[0]
+                if self.debug:
+                    print("+ APPEND LWSTRIPPED", repr(line_lwstrip))
+                value.append(line_lwstrip)
             elif line.startswith("  ") and (
                 style in block_styles or line_lwstrip != "\n"
             ):
@@ -455,44 +455,43 @@ class LazyDict_YAML_Lite(LazyDict_YAML_UltraLite):
                     self._collect(key, value, style)
                 tokens = line.split(":", 1)
                 key = unquote(tokens[0].strip())
-                if len(tokens) > 1:
-                    token = tokens[1].lstrip(" ").rstrip(" \n")
-                    if token.startswith("|") or token.startswith(">"):
-                        if token[1:2] in "+-":
-                            style = token[:2]
-                            token = token[2:].lstrip(" ")
-                        else:
-                            style = token[:1]
-                            token = token[1:].lstrip(" ")
-                    else:
-                        style = ""
-                    if token.startswith("\t"):
-                        raise ValueError(
-                            "Found character '\\t' that cannot "
-                            "start any token (%r line %i)"
-                            % (safe_str(getattr(fileobj, "name", line)), i)
-                        )
-                    if style.startswith(">"):
-                        raise NotImplementedError(
-                            "Folded style is not "
-                            "supported (%r line %i)"
-                            % (safe_str(getattr(fileobj, "name", line)), i)
-                        )
-                    if token.startswith("#"):
-                        # Block or folded
-                        if self.debug:
-                            print("IN BLOCK", repr(key), style)
-                        value = []
-                        continue
-                    if style and token:
-                        raise ValueError(
-                            "Expected a comment or a line break "
-                            "(%r line %i)"
-                            % (safe_str(getattr(fileobj, "name", line)), i)
-                        )
-                else:
+                if len(tokens) <= 1:
                     raise ValueError(
                         "Unsupported format (%r line %i)"
+                        % (safe_str(getattr(fileobj, "name", line)), i)
+                    )
+                token = tokens[1].lstrip(" ").rstrip(" \n")
+                if token.startswith("|") or token.startswith(">"):
+                    if token[1:2] in "+-":
+                        style = token[:2]
+                        token = token[2:].lstrip(" ")
+                    else:
+                        style = token[:1]
+                        token = token[1:].lstrip(" ")
+                else:
+                    style = ""
+                if token.startswith("\t"):
+                    raise ValueError(
+                        "Found character '\\t' that cannot "
+                        "start any token (%r line %i)"
+                        % (safe_str(getattr(fileobj, "name", line)), i)
+                    )
+                if style.startswith(">"):
+                    raise NotImplementedError(
+                        "Folded style is not "
+                        "supported (%r line %i)"
+                        % (safe_str(getattr(fileobj, "name", line)), i)
+                    )
+                if token.startswith("#"):
+                    # Block or folded
+                    if self.debug:
+                        print("IN BLOCK", repr(key), style)
+                    value = []
+                    continue
+                if style and token:
+                    raise ValueError(
+                        "Expected a comment or a line break "
+                        "(%r line %i)"
                         % (safe_str(getattr(fileobj, "name", line)), i)
                     )
                 if style or not token:
@@ -532,14 +531,9 @@ class LazyDict_YAML_Lite(LazyDict_YAML_UltraLite):
                         print("SET", repr(token_rstrip))
                     value = [token_rstrip]
             else:
-                # if line_lwstrip == "\n":
-                if True:
-                    if self.debug:
-                        print("APPEND LWSTRIPPED", repr(line_lwstrip))
-                    line = line_lwstrip
-                else:
-                    if self.debug:
-                        print("APPEND", repr(line))
+                if self.debug:
+                    print("APPEND LWSTRIPPED", repr(line_lwstrip))
+                line = line_lwstrip
                 value.append(line)
         if quote:
             raise ValueError(
@@ -587,7 +581,6 @@ class LazyDict_YAML_Lite(LazyDict_YAML_UltraLite):
             # Keep trailing newlines
             if self.debug:
                 print("KEEP")
-            pass
         else:
             out = out.rstrip("\n")
             if style == ">i":
@@ -596,7 +589,6 @@ class LazyDict_YAML_Lite(LazyDict_YAML_UltraLite):
                 # Chomp trailing newlines
                 if self.debug:
                     print("CHOMP")
-                pass
             else:
                 # Clip trailing newlines (default)
                 if self.debug:
@@ -620,7 +612,7 @@ def test():
         try:
             return yaml.safe_load(StringIO(doc))
         except Exception as e:
-            print("%s:" % e.__class__.__name__, e)
+            print(f"{e.__class__.__name__}:", e)
             return e
 
     def l(doc):
@@ -628,7 +620,7 @@ def test():
         try:
             l.parse(StringIO(doc))
         except Exception as e:
-            print("%s:" % e.__class__.__name__, e)
+            print(f"{e.__class__.__name__}:", e)
             return e
         return l
 

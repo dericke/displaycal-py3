@@ -45,15 +45,14 @@ def specialpow(a, b, slope_limit=0):
 
     """
     if b >= 0.0:
-        # Power curve
         if a < 0.0:
-            if slope_limit:
-                return min(-math.pow(-a, b), a / slope_limit)
-            return -math.pow(-a, b)
-        else:
-            if slope_limit:
-                return max(math.pow(a, b), a / slope_limit)
-            return math.pow(a, b)
+            return (
+                min(-math.pow(-a, b), a / slope_limit)
+                if slope_limit
+                else -math.pow(-a, b)
+            )
+
+        return max(math.pow(a, b), a / slope_limit) if slope_limit else math.pow(a, b)
     if a < 0.0:
         signScale = -1.0
         a = -a
@@ -90,16 +89,10 @@ def specialpow(a, b, slope_limit=0):
         ) ** SMPTE2084_M2
     elif b == -2.4:
         # RGB -> XYZ, sRGB TRC
-        if a <= SRGB_K0:
-            v = a / SRGB_P
-        else:
-            v = math.pow((a + 0.055) / 1.055, 2.4)
+        v = a / SRGB_P if a <= SRGB_K0 else math.pow((a + 0.055) / 1.055, 2.4)
     elif b == -3.0:
         # RGB -> XYZ, L* TRC
-        if a <= 0.08:  # E * K * 0.01
-            v = 100.0 * a / LSTAR_K
-        else:
-            v = math.pow((a + 0.16) / 1.16, 3.0)
+        v = 100.0 * a / LSTAR_K if a <= 0.08 else math.pow((a + 0.16) / 1.16, 3.0)
     elif b == -240:
         # RGB -> XYZ, SMPTE 240M TRC
         if a < SMPTE240M_K0:
@@ -224,16 +217,10 @@ class HLG(object):
         c = 0.5 - a * math.log(4 * a)
         if inverse:
             # Non-linear HLG signal to relative scene linear light
-            if 0 <= v <= 1 / 2.0:
-                v = v**2 / 3.0
-            else:
-                v = (math.exp((v - c) / a) + b) / 12.0
+            v = v**2 / 3.0 if 0 <= v <= 1 / 2.0 else (math.exp((v - c) / a) + b) / 12.0
         else:
             # Relative scene linear light to non-linear HLG signal
-            if 0 <= v <= 1 / 12.0:
-                v = math.sqrt(3 * v)
-            else:
-                v = a * math.log(12 * v - b) + c
+            v = math.sqrt(3 * v) if 0 <= v <= 1 / 12.0 else a * math.log(12 * v - b) + c
         return v
 
     def eotf(self, RGB, inverse=False, apply_black_offset=True):
@@ -245,10 +232,7 @@ class HLG(object):
         Output range 0..1
 
         """
-        if isinstance(RGB, (float, int)):
-            R, G, B = (RGB,) * 3
-        else:
-            R, G, B = RGB
+        R, G, B = (RGB,) * 3 if isinstance(RGB, (float, int)) else RGB
         if inverse:
             # Display light -> relative scene linear light -> HLG signal
             R, G, B = (
@@ -270,14 +254,8 @@ class HLG(object):
         Output range 0..1
 
         """
-        if isinstance(RGB, (float, int)):
-            R, G, B = (RGB,) * 3
-        else:
-            R, G, B = RGB
-        if apply_black_offset:
-            black_cdm2 = float(self.black_cdm2)
-        else:
-            black_cdm2 = 0
+        R, G, B = (RGB,) * 3 if isinstance(RGB, (float, int)) else RGB
+        black_cdm2 = float(self.black_cdm2) if apply_black_offset else 0
         alpha = (self.white_cdm2 - black_cdm2) / self.white_cdm2
         beta = black_cdm2 / self.white_cdm2
         Y = 0.2627 * R + 0.6780 * G + 0.0593 * B
@@ -715,10 +693,7 @@ def interp_old(x, xp, fp, left=None, right=None):
 
     """
     if not isinstance(x, (int, float, complex)):
-        yi = []
-        for n in x:
-            yi.append(interp_old(n, xp, fp, left, right))
-        return yi
+        return [interp_old(n, xp, fp, left, right) for n in x]
     if x in xp:
         return fp[xp.index(x)]
     elif x < xp[0]:
@@ -756,34 +731,23 @@ def interp(x, xp, fp, left=None, right=None, period=None):
 
 def interp_resize(iterable, new_size, use_numpy=False):
     """Change size of iterable through linear interpolation"""
-    result = []
     x_new = list(range(len(iterable)))
-    # interp = Interp(x_new, iterable, use_numpy=use_numpy)
-    for i in range(new_size):
-        result.append(
-            interp(
-                i / (new_size - 1.0) * (len(iterable) - 1.0),
-                x_new,
-                iterable,
-            )
+    return [
+        interp(
+            i / (new_size - 1.0) * (len(iterable) - 1.0),
+            x_new,
+            iterable,
         )
-    return result
+        for i in range(new_size)
+    ]
 
 
 def interp_fill(xp, fp, new_size, use_numpy=False):
     """Fill missing points by interpolation"""
-    result = []
     last = xp[-1]
-    # interp = Interp(xp, fp, use_numpy=use_numpy)
-    for i in range(new_size):
-        result.append(
-            interp(
-                i / (new_size - 1.0) * last,
-                xp,
-                fp
-            )
-        )
-    return result
+    return [
+        interp(i / (new_size - 1.0) * last, xp, fp) for i in range(new_size)
+    ]
 
 
 def smooth_avg_old(values, passes=1, window=None, protect=None):
@@ -805,7 +769,7 @@ def smooth_avg_old(values, passes=1, window=None, protect=None):
                 Warning,
             )
         window = (1.0, 1.0, 1.0)
-    for _x in range(0, passes):
+    for _x in range(passes):
         data = []
         for j, v in enumerate(values):
             tmp_window = window
@@ -815,9 +779,11 @@ def smooth_avg_old(values, passes=1, window=None, protect=None):
                     # print j, tl, tmp_window
                     if tl > 0 and j - tl >= 0 and j + tl <= len(values) - 1:
                         windowslice = values[int(j - tl): int(j + tl + 1)]
-                        windowsize = 0
-                        for k, weight in enumerate(tmp_window):
-                            windowsize += float(weight) * windowslice[k]
+                        windowsize = sum(
+                            float(weight) * windowslice[k]
+                            for k, weight in enumerate(tmp_window)
+                        )
+
                         v = windowsize / sum(tmp_window)
                         break
                     else:
@@ -852,14 +818,14 @@ def smooth_avg(values, passes=1, window=None, protect=None):
     # fix the window values
     window_length = float(len(window))
     window_weight = sum(window)
-    window = tuple([i/window_weight for i in window])
+    window = tuple(i/window_weight for i in window)
 
     # extend the array by ceil(window_size / 2)
     extend_amount = math.ceil(window_length / 2)
 
     # protect start and end values by adding the first and last values by the half of
     # the window length
-    values = values[0:1] * extend_amount + values + values[-1:] * extend_amount
+    values = values[:1] * extend_amount + values + values[-1:] * extend_amount
 
     protection_extension = 1
     protected_start = values[:extend_amount + protection_extension]
@@ -872,7 +838,7 @@ def smooth_avg(values, passes=1, window=None, protect=None):
             protected_values[index + extend_amount] = values[index + extend_amount]
 
     import numpy
-    for i in range(passes):
+    for _ in range(passes):
         values = list(numpy.convolve(values, window, mode="same"))
         # Protect start and end values
         values[:extend_amount + protection_extension] = protected_start
@@ -880,8 +846,7 @@ def smooth_avg(values, passes=1, window=None, protect=None):
 
         # restore protected values
         if protect is not None:
-            for k in protected_values:
-                v = protected_values[k]
+            for k, v in protected_values.items():
                 values[k] = v
 
     # return the non-extended portion

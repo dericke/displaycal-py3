@@ -25,13 +25,9 @@ from DisplayCAL.meta import py_minversion, py_maxversion
 pyver = sys.version_info[:2]
 if pyver < py_minversion or pyver > py_maxversion:
     raise RuntimeError(
-        "Need Python version >= %s <= %s, got %s"
-        % (
-            ".".join(str(n) for n in py_minversion),
-            ".".join(str(n) for n in py_maxversion),
-            sys.version.split()[0],
-        )
+        f'Need Python version >= {".".join(str(n) for n in py_minversion)} <= {".".join(str(n) for n in py_maxversion)}, got {sys.version.split()[0]}'
     )
+
 
 from DisplayCAL.config import (
     autostart_home,

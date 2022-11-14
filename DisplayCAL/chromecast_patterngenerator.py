@@ -89,9 +89,8 @@ class ChromeCastPatternGenerator(object):
 
     def disconnect_client(self):
         self.listening = False
-        if hasattr(self, "_cc"):
-            if self._cc.app_id:
-                self._cc.quit_app()
+        if hasattr(self, "_cc") and self._cc.app_id:
+            self._cc.quit_app()
         if hasattr(self, "conn"):
             del self.conn
 
@@ -120,8 +119,10 @@ class ChromeCastPatternGenerator(object):
         self.listening = True
         if self.logfile:
             self.logfile.write(
-                lang.getstr("connecting.to", ("Chromecast", " " + self.name)) + "\n"
+                lang.getstr("connecting.to", ("Chromecast", f" {self.name}"))
+                + "\n"
             )
+
         if not hasattr(self, "_cc"):
             # Find our ChromeCast
             try:

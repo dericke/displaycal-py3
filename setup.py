@@ -29,10 +29,10 @@ sys.path.insert(1, str(pydir))
 
 def create_appdmg(zeroinstall=False):
     if zeroinstall:
-        dmgname = name + "-0install"
+        dmgname = f"{name}-0install"
         srcdir = "0install"
     else:
-        dmgname = name + "-" + version
+        dmgname = f"{name}-{version}"
         srcdir = f"py2app.{get_platform()}-py{sys.version[:3]}"
 
     retcode = subprocess.call(
@@ -77,7 +77,7 @@ def format_changelog(changelog, fmt="appstream"):
 
             if tagname not in allowed_tags:
                 changelog = changelog.replace(tag, "")
-                changelog = changelog.replace("</" + tagname + ">", "")
+                changelog = changelog.replace(f"</{tagname}>", "")
 
         # Remove macOS and Windows specific items
         changelog = re.sub(
@@ -308,10 +308,9 @@ def replace_placeholders(
         "WX_MINVERSION": ".".join(str(n) for n in wx_minversion),
         "YEAR": strftime("%Y", gmtime(lastmod_time or os.stat(tmpl_path).st_mtime)),
     }
-    mapping.update(iterable or {})
+    mapping |= (iterable or {})
 
-    for key in mapping:
-        val = mapping[key]
+    for key, val in mapping.items():
         tmpl_data = tmpl_data.replace(f"${{{key}}}", val)
 
     tmpl_data = tmpl_data.replace(

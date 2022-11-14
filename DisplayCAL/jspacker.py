@@ -22,7 +22,7 @@ class Pattern(object):
         self.length = length
 
     def __str__(self):
-        return "(" + self.expression + ")"
+        return f"({self.expression})"
 
 
 class Patterns(list):
@@ -56,11 +56,8 @@ class ParseMaster(object):
     def _repl(self, a, o, r, i):
         while i:
             m = a.group(o + i - 1)
-            if m is None:
-                s = ""
-            else:
-                s = m
-            r = r.replace("$" + str(i), s)
+            s = "" if m is None else m
+            r = r.replace(f"${str(i)}", s)
             i = i - 1
         r = ParseMaster.TRIM.sub("$1", r)
         return r
@@ -289,10 +286,7 @@ class JavaScriptPacker:
         parser = ParseMaster()
         encode = self.getEncoder(encoding)
         # for high-ascii, don't encode single character low-ascii
-        if encoding > 62:
-            regexp = r"""\w\w+"""
-        else:
-            regexp = r"""\w+"""
+        regexp = r"""\w\w+""" if encoding > 62 else r"""\w+"""
         # build the word list
         keywords = self.analyze(script, regexp, encode)
         encoded = keywords["encoded"]
@@ -322,7 +316,7 @@ class JavaScriptPacker:
             count = {}
             all.reverse()
             for word in all:
-                word = "$" + word
+                word = f"${word}"
                 if word not in count:
                     count[word] = 0
                     j = len(unsorted)
@@ -330,7 +324,7 @@ class JavaScriptPacker:
                     # make a dictionary of all of the protected words in this script
                     #  these are words that might be mistaken for encoding
                     values[j] = encode(j)
-                    _protected["$" + values[j]] = j
+                    _protected[f"${values[j]}"] = j
                 count[word] = count[word] + 1
             # prepare to sort the word list, first we must protect
             #  words that are also used as codes. we assign them a code
@@ -357,7 +351,7 @@ class JavaScriptPacker:
         return {"sorted": sorted_, "encoded": encoded, "protected": protected}
 
     def encodePrivate(self, charCode):
-        return "_" + str(charCode)
+        return f"_{str(charCode)}"
 
     def encodeSpecialChars(self, script):
         parser = ParseMaster()
@@ -427,10 +421,7 @@ class JavaScriptPacker:
         encode = encoding_functions[encoding]
         encode = encode.replace("_encoding", "$ascii")
         encode = encode.replace("arguments.callee", "$encode")
-        if ascii > 10:
-            inline = "$count.toString($ascii)"
-        else:
-            inline = "$count"
+        inline = "$count.toString($ascii)" if ascii > 10 else "$count"
         # $decode: code snippet to speed up decoding
         if fastDecode:
             # create the decoder
@@ -450,10 +441,8 @@ class JavaScriptPacker:
                         }"""
             if encoding > 62:
                 decode = decode.replace("\\\\w", "[\\xa1-\\xff]")
-            else:
-                # perform the encoding inline for lower ascii values
-                if ascii < 36:
-                    decode = ENCODE.sub(inline, decode)
+            elif ascii < 36:
+                decode = ENCODE.sub(inline, decode)
             # special case: when $count==0 there ar no keywords. i want to keep
             #  the basic shape of the unpacking funcion so i'll frig the code...
             if not count:
@@ -494,7 +483,7 @@ class JavaScriptPacker:
             params.extend(["0", "{}"])
 
         # the whole thing
-        return "eval(" + unpack + "(" + ",".join(params) + "))\n"
+        return f"eval({unpack}(" + ",".join(params) + "))\n"
 
     def pack(
         self, script, encoding=0, fastDecode=False, specialChars=False, compaction=True
@@ -505,9 +494,8 @@ class JavaScriptPacker:
         if specialChars:
             script = self.specialCompression(script)
             script = self.encodeSpecialChars(script)
-        else:
-            if compaction:
-                script = self.basicCompression(script)
+        elif compaction:
+            script = self.basicCompression(script)
         if encoding:
             script = self.encodeKeywords(script, encoding, fastDecode)
         return script
@@ -517,14 +505,12 @@ def run():
     p = JavaScriptPacker()
     script = open(sys.argv[1]).read()
     result = p.pack(script, encoding=62, fastDecode=True, compaction=True)
-    open(sys.argv[1] + "pack", "w").write(result)
+    open(f"{sys.argv[1]}pack", "w").write(result)
 
 
 def run1():
 
-    test_scripts = []
-
-    test_scripts.append(
+    test_scripts = [
         (
             """// -----------------------------------------------------------------------
 // public interface
@@ -537,10 +523,7 @@ cssQuery.toString = function() {
             False,
             False,
             """cssQuery.toString=function(){return"function cssQuery() {\n  [version "+version+"]\n}"};""",
-        )
-    )
-
-    test_scripts.append(
+        ),
         (
             """function test(_localvar) {
     var $name = 'foo';
@@ -552,10 +535,7 @@ cssQuery.toString = function() {
             False,
             True,
             """function test(_0){var n='foo';var du=2;return n+du}""",
-        )
-    )
-
-    test_scripts.append(
+        ),
         (
             """function _test($localvar) {
     var $name = 1;
@@ -568,10 +548,7 @@ cssQuery.toString = function() {
             False,
             True,
             """function _1(l){var n=1;var _0=2;var __foo=3;return n+_0+l+__foo}""",
-        )
-    )
-
-    test_scripts.append(
+        ),
         (
             """function _test($localvar) {
     var $name = 1;
@@ -592,26 +569,19 @@ function _bar(_ocalvar) {
             False,
             True,
             """function _3(l){var n=1;var _0=2;var __foo=3;return n+_0+l+__foo}function _2(_1){var n=1;var _0=2;var __foo=3;return n+_0+l+__foo}""",
-        )
-    )
-
-    test_scripts.append(("cssQuery1.js", 0, False, False, "cssQuery1-p1.js"))
-    test_scripts.append(("cssQuery.js", 0, False, False, "cssQuery-p1.js"))
-    test_scripts.append(("pack.js", 0, False, False, "pack-p1.js"))
-    test_scripts.append(("cssQuery.js", 0, False, True, "cssQuery-p2.js"))
-    # the following ones are different, because javascript might use an
-    # unstable sort algorithm while python uses an stable sort algorithm
-    test_scripts.append(("pack.js", 0, False, True, "pack-p2.js"))
-    test_scripts.append(
+        ),
+        ("cssQuery1.js", 0, False, False, "cssQuery1-p1.js"),
+        ("cssQuery.js", 0, False, False, "cssQuery-p1.js"),
+        ("pack.js", 0, False, False, "pack-p1.js"),
+        ("cssQuery.js", 0, False, True, "cssQuery-p2.js"),
+        ("pack.js", 0, False, True, "pack-p2.js"),
         (
             "test.js",
             0,
             False,
             True,
             """function _4(l){var n=1;var _0=2;var __foo=3;return n+_0+l+__foo}function _3(_1){var n=1;var _2=2;var __foo=3;return n+_2+l+__foo}""",
-        )
-    )
-    test_scripts.append(
+        ),
         (
             "test.js",
             10,
@@ -619,9 +589,7 @@ function _bar(_ocalvar) {
             False,
             """eval(function(p,a,c,k,e,d){while(c--){if(k[c]){p=p.replace(new RegExp("\\b"+e(c)+"\\b","g"),k[c])}}return p}('8 13($6){0 $4=1;0 7=2;0 5=3;9 $4+7+$6+5}8 11(12){0 $4=1;0 10=2;0 5=3;9 $4+10+$6+5}',10,14,'var||||name|__foo|localvar|_dummy|function|return|_2|_bar|_ocalvar|_test'.split('|')))
 """,
-        )
-    )
-    test_scripts.append(
+        ),
         (
             "test.js",
             62,
@@ -629,24 +597,19 @@ function _bar(_ocalvar) {
             False,
             """eval(function(p,a,c,k,e,d){while(c--){if(k[c]){p=p.replace(new RegExp("\\b"+e(c)+"\\b","g"),k[c])}}return p}('8 d($6){0 $4=1;0 7=2;0 5=3;9 $4+7+$6+5}8 b(c){0 $4=1;0 a=2;0 5=3;9 $4+a+$6+5}',14,14,'var||||name|__foo|localvar|_dummy|function|return|_2|_bar|_ocalvar|_test'.split('|')))
 """,
-        )
-    )
-    test_scripts.append(("test.js", 95, False, False, "test-p4.js"))
-    test_scripts.append(("cssQuery.js", 0, False, True, "cssQuery-p3.js"))
-    test_scripts.append(("cssQuery.js", 62, False, True, "cssQuery-p4.js"))
+        ),
+        ("test.js", 95, False, False, "test-p4.js"),
+        ("cssQuery.js", 0, False, True, "cssQuery-p3.js"),
+        ("cssQuery.js", 62, False, True, "cssQuery-p4.js"),
+    ]
+
 
     import difflib
 
     p = JavaScriptPacker()
     for script, encoding, fastDecode, specialChars, expected in test_scripts:
-        if os.path.exists(script):
-            _script = open(script).read()
-        else:
-            _script = script
-        if os.path.exists(expected):
-            _expected = open(expected).read()
-        else:
-            _expected = expected
+        _script = open(script).read() if os.path.exists(script) else script
+        _expected = open(expected).read() if os.path.exists(expected) else expected
         print(script[:20], encoding, fastDecode, specialChars, expected[:20])
         print("=" * 40)
         result = p.pack(_script, encoding, fastDecode, specialChars)

@@ -98,7 +98,7 @@ def init(lib=None, samplerate=22050, channels=2, buffersize=2048, reinit=False):
                 except ValueError:
                     version.append(item)
             if version < [1, 2, 2]:
-                raise ImportError("pyglet version %s is too old" % pyglet.version)
+                raise ImportError(f"pyglet version {pyglet.version} is too old")
             _lib = "pyglet"
         except ImportError:
             _lib = None
@@ -134,11 +134,11 @@ def init(lib=None, samplerate=22050, channels=2, buffersize=2048, reinit=False):
                 _lib_version = ".".join(str(v) for v in pyo.getVersion())
     elif lib == "SDL":
         SDL_INIT_AUDIO = 16
-        AUDIO_S16LSB = 0x8010
-        AUDIO_S16MSB = 0x9010
         if sys.byteorder == "little":
+            AUDIO_S16LSB = 0x8010
             MIX_DEFAULT_FORMAT = AUDIO_S16LSB
         else:
+            AUDIO_S16MSB = 0x9010
             MIX_DEFAULT_FORMAT = AUDIO_S16MSB
         if sys.platform == "win32":
             pth = getenvu("PATH")
@@ -147,10 +147,8 @@ def init(lib=None, samplerate=22050, channels=2, buffersize=2048, reinit=False):
                 pth = libpth + os.pathsep + pth
                 os.environ["PATH"] = safe_str(pth)
         elif sys.platform == "darwin":
-            x_framework_pth = os.getenv("X_DYLD_FALLBACK_FRAMEWORK_PATH")
-            if x_framework_pth:
-                framework_pth = os.getenv("DYLD_FALLBACK_FRAMEWORK_PATH")
-                if framework_pth:
+            if x_framework_pth := os.getenv("X_DYLD_FALLBACK_FRAMEWORK_PATH"):
+                if framework_pth := os.getenv("DYLD_FALLBACK_FRAMEWORK_PATH"):
                     x_framework_pth = os.pathsep.join([x_framework_pth, framework_pth])
                 os.environ["DYLD_FALLBACK_FRAMEWORK_PATH"] = x_framework_pth
         for libname in ("SDL2", "SDL2_mixer", "SDL", "SDL_mixer"):
@@ -167,16 +165,11 @@ def init(lib=None, samplerate=22050, channels=2, buffersize=2048, reinit=False):
                         pass
             elif sys.platform != "darwin":
                 # Hard-code lib names for Linux
-                libfn = "lib" + libname
-                if libname.startswith("SDL2"):
-                    # SDL 2.0
-                    libfn += "-2.0.so.0"
-                else:
-                    # SDL 1.2
-                    libfn += "-1.2.so.0"
+                libfn = f"lib{libname}"
+                libfn += "-2.0.so.0" if libname.startswith("SDL2") else "-1.2.so.0"
             dll = dlopen(libfn, handle=handle)
             if dll:
-                print("%s:" % libname, libfn)
+                print(f"{libname}:", libfn)
             if libname.endswith("_mixer"):
                 if not dll:
                     continue
@@ -202,10 +195,7 @@ def init(lib=None, samplerate=22050, channels=2, buffersize=2048, reinit=False):
                     samplerate, MIX_DEFAULT_FORMAT, channels, buffersize
                 )
                 _lib = "SDL"
-                if libname.startswith("SDL2"):
-                    _lib_version = "2.0"
-                else:
-                    _lib_version = "1.2"
+                _lib_version = "2.0" if libname.startswith("SDL2") else "1.2"
                 break
             else:
                 sdl = dll
@@ -242,16 +232,15 @@ def Sound(filename, loop=False, raise_exceptions=False):
     if (filename, loop) in _sounds:
         # Cache hit
         return _sounds[(filename, loop)]
-    else:
-        try:
-            sound = _Sound(filename, loop)
-        except Exception as exception:
-            if raise_exceptions:
-                raise
-            print(exception)
-            sound = _Sound(None, loop)
-        _sounds[(filename, loop)] = sound
-        return sound
+    try:
+        sound = _Sound(filename, loop)
+    except Exception as exception:
+        if raise_exceptions:
+            raise
+        print(exception)
+        sound = _Sound(None, loop)
+    _sounds[(filename, loop)] = sound
+    return sound
 
 
 class DummySound(object):

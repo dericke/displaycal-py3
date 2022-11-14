@@ -94,10 +94,11 @@ def get_latest_changelog_entry(readme):
 def script2pywname(script):
     """Convert all-lowercase script name to mixed-case pyw name"""
     a2b = {
-        name + "-3dlut-maker": name + "-3DLUT-maker",
-        name + "-vrml-to-x3d-converter": name + "-VRML-to-X3D-converter",
-        name + "-eecolor-to-madvr-converter": name + "-eeColor-to-madVR-converter",
+        f"{name}-3dlut-maker": f"{name}-3DLUT-maker",
+        f"{name}-vrml-to-x3d-converter": f"{name}-VRML-to-X3D-converter",
+        f"{name}-eecolor-to-madvr-converter": f"{name}-eeColor-to-madVR-converter",
     }
+
     if script.lower().startswith(name.lower()):
         pyw = name + script[len(name) :]
         return a2b.get(pyw, pyw)
