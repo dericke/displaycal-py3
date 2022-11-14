@@ -84,10 +84,11 @@ def get_known_folder_path(folderid, user=True):
         # Linux
         user_dir = folderid
         folderid = (
-            {"Downloads": folderid[:-1], "Public": folderid + "share"}
+            {"Downloads": folderid[:-1], "Public": f"{folderid}share"}
             .get(folderid, folderid)
             .upper()
         )
+
         if folderid != "DESKTOP" or XDG.UserDirs.enabled:
             user_dir = XDG.UserDirs.default_dirs.get(folderid)
         if user:
@@ -256,11 +257,7 @@ else:
 
         @staticmethod
         def shell_unescape(s):
-            a = []
-            for i, c in enumerate(s):
-                if c == "\\" and len(s) > i + 1:
-                    continue
-                a.append(c)
+            a = [c for i, c in enumerate(s) if c != "\\" or len(s) <= i + 1]
             return "".join(a)
 
         @staticmethod

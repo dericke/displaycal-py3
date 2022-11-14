@@ -84,7 +84,7 @@ class GenHTTPPatternGeneratorClient(object):
             if resp.status == http.client.OK:
                 return self._validate(resp, url, validate)
             else:
-                raise http.client.HTTPException("%s %s" % (resp.status, resp.reason))
+                raise http.client.HTTPException(f"{resp.status} {resp.reason}")
 
     def _shutdown(self):
         # Override this method in subclass!
@@ -254,10 +254,10 @@ class PrismaPatternGeneratorClient(GenHTTPPatternGeneratorClient):
             sock.bind(("", port))
             thread = threading.Thread(
                 target=self._cast_receive_handler,
-                name="PrismaPatternGeneratorClient.BroadcastHandler[%s:%s]"
-                % (self.broadcast_ip, port),
+                name=f"PrismaPatternGeneratorClient.BroadcastHandler[{self.broadcast_ip}:{port}]",
                 args=(sock, self.broadcast_ip, port),
             )
+
             self._threads.append(thread)
             thread.start()
         except error as exception:
@@ -343,11 +343,10 @@ class PrismaPatternGeneratorClient(GenHTTPPatternGeneratorClient):
 
         """
         if event_name in self._event_handlers:
-            if handler in self._event_handlers[event_name]:
-                self._event_handlers[event_name].remove(handler)
-                return handler
-            else:
+            if handler not in self._event_handlers[event_name]:
                 return self._event_handlers.pop(event_name)
+            self._event_handlers[event_name].remove(handler)
+            return handler
 
     def _dispatch_event(self, event_name, event_data=None):
         """Dispatch events"""
@@ -371,11 +370,11 @@ class PrismaPatternGeneratorClient(GenHTTPPatternGeneratorClient):
         return rgb, bgrgb, bits
 
     def invoke(self, api, method=None, params=None, validate=None):
-        url = "/" + api
+        url = f"/{api}"
         if method:
-            url += "?m=" + method
+            url += f"?m={method}"
             if params:
-                url += "&" + urllib.parse.unquote_plus(urllib.parse.urlencode(params))
+                url += f"&{urllib.parse.unquote_plus(urllib.parse.urlencode(params))}"
         if not validate:
             validate = {method: "Ok"}
         return self._request("GET", url, validate=validate)
@@ -396,7 +395,7 @@ class PrismaPatternGeneratorClient(GenHTTPPatternGeneratorClient):
             if b"m" in query:
                 method = query[b"m"][0]
                 if data.get(method) == "Error" and "msg" in data:
-                    raise http.client.HTTPException("%s: %s" % (self.host, data["msg"]))
+                    raise http.client.HTTPException(f'{self.host}: {data["msg"]}')
             for key in validate:
                 value = validate[key]
                 if key not in data:
@@ -424,10 +423,7 @@ class PrismaPatternGeneratorClient(GenHTTPPatternGeneratorClient):
         self.enable_processing(False, size)
 
     def enable_processing(self, enable=True, size=10):
-        if enable:
-            win = 1
-        else:
-            win = 2
+        win = 1 if enable else 2
         self.invoke("Window", "win%i" % win, {"sz": size})
 
     def get_config(self):
@@ -504,7 +500,7 @@ class ResolveLSPatternGeneratorServer(GenTCPSockPatternGeneratorServer):
             '<geometry x="%.4f" y="%.4f" cx="%.4f" cy="%.4f" /></rectangle>'
             "</shapes></calibration>" % tuple(rgb + [x, y, w, h])
         )
-        self.conn.sendall("%s%s" % (struct.pack(">I", len(xml)), xml))
+        self.conn.sendall(f'{struct.pack(">I", len(xml))}{xml}')
 
 
 class ResolveCMPatternGeneratorServer(GenTCPSockPatternGeneratorServer):

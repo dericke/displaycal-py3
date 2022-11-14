@@ -447,10 +447,7 @@ class FloatSpin(wx.PyControl):
             self._text_top = 0
         else:
             # GTK
-            if "gtk3" in wx.PlatformInfo:
-                self._gap = 1
-            else:
-                self._gap = -1
+            self._gap = 1 if "gtk3" in wx.PlatformInfo else -1
             self._spin_top = 0
             self._text_left = 0
             self._text_top = 0
@@ -468,30 +465,33 @@ class FloatSpin(wx.PyControl):
         if height == -1:
             height = best_size.GetHeight()
 
-        self._validkeycode = [43, 44, 45, 46, 69, 101]
-        self._validkeycode.extend(list(range(48, 58)))
-        self._validkeycode.extend(
-            [
-                wx.WXK_BACK,
-                wx.WXK_DELETE,
-                wx.WXK_LEFT,
-                wx.WXK_RIGHT,
-                wx.WXK_NUMPAD0,
-                wx.WXK_NUMPAD1,
-                wx.WXK_NUMPAD2,
-                wx.WXK_NUMPAD3,
-                wx.WXK_NUMPAD4,
-                wx.WXK_NUMPAD5,
-                wx.WXK_NUMPAD6,
-                wx.WXK_NUMPAD7,
-                wx.WXK_NUMPAD8,
-                wx.WXK_NUMPAD9,
-                wx.WXK_NUMPAD_ADD,
-                wx.WXK_NUMPAD_DECIMAL,
-                wx.WXK_NUMPAD_SEPARATOR,
-                wx.WXK_NUMPAD_SUBTRACT,
-            ]
-        )
+        self._validkeycode = [
+            43,
+            44,
+            45,
+            46,
+            69,
+            101,
+            *list(range(48, 58)),
+            wx.WXK_BACK,
+            wx.WXK_DELETE,
+            wx.WXK_LEFT,
+            wx.WXK_RIGHT,
+            wx.WXK_NUMPAD0,
+            wx.WXK_NUMPAD1,
+            wx.WXK_NUMPAD2,
+            wx.WXK_NUMPAD3,
+            wx.WXK_NUMPAD4,
+            wx.WXK_NUMPAD5,
+            wx.WXK_NUMPAD6,
+            wx.WXK_NUMPAD7,
+            wx.WXK_NUMPAD8,
+            wx.WXK_NUMPAD9,
+            wx.WXK_NUMPAD_ADD,
+            wx.WXK_NUMPAD_DECIMAL,
+            wx.WXK_NUMPAD_SEPARATOR,
+            wx.WXK_NUMPAD_SUBTRACT,
+        ]
 
         self._spinbutton = wx.SpinButton(
             self,
@@ -840,15 +840,10 @@ class FloatSpin(wx.PyControl):
                     wx.PyCommandEvent(wx.EVT_BUTTON.typeId, default.GetId())
                 )
 
-        else:
-            if (
-                not event.CmdDown()
-                and not event.ControlDown()
-                and keycode not in self._validkeycode
-            ):
-                return
-
+        elif event.CmdDown() or event.ControlDown() or keycode in self._validkeycode:
             event.Skip()
+        else:
+            return
 
     def OnMouseWheel(self, event):
         """Handles the ``wx.EVT_MOUSEWHEEL`` event for :class:`FloatSpin`.
@@ -951,7 +946,7 @@ class FloatSpin(wx.PyControl):
                     value = self._defaultvalue + ceil(snap_value) * self._increment
 
         decimal = locale.localeconv()["decimal_point"]
-        strs = ("%100." + str(self._digits) + self._textformat[1]) % value
+        strs = f"%100.{str(self._digits)}{self._textformat[1]}" % value
         strs = strs.replace(".", decimal)
         strs = strs.replace(",", ".")
         strs = strs.strip()
@@ -997,14 +992,8 @@ class FloatSpin(wx.PyControl):
         :note: This method doesn't modify the current value.
         """
 
-        if min_val is not None:
-            self._min = FixedPoint(str(min_val), 20)
-        else:
-            self._min = None
-        if max_val is not None:
-            self._max = FixedPoint(str(max_val), 20)
-        else:
-            self._max = None
+        self._min = FixedPoint(str(min_val), 20) if min_val is not None else None
+        self._max = FixedPoint(str(max_val), 20) if max_val is not None else None
 
     def SetRange(self, min_val, max_val):
         """Sets the allowed range.
@@ -1044,14 +1033,12 @@ class FloatSpin(wx.PyControl):
         :return: A clamped copy of `var`.
         """
 
-        if self._min is not None:
-            if float(var) < float(self._min):
-                var = self._min
-                return var
+        if self._min is not None and float(var) < float(self._min):
+            var = self._min
+            return var
 
-        if self._max is not None:
-            if float(var) > float(self._max):
-                var = self._max
+        if self._max is not None and float(var) > float(self._max):
+            var = self._max
 
         return var
 
@@ -1084,11 +1071,7 @@ class FloatSpin(wx.PyControl):
 
         if digits < 0:
             incr = str(self._increment)
-            if incr.find(".") < 0:
-                digits = 0
-            else:
-                digits = len(incr[incr.find(".") + 1:])
-
+            digits = 0 if incr.find(".") < 0 else len(incr[incr.find(".") + 1:])
         self._digits = digits
 
         self.SetValue(self._value)
@@ -1209,9 +1192,7 @@ class FloatSpin(wx.PyControl):
         curr = curr.strip()
         decimal = locale.localeconv()["decimal_point"]
         curr = curr.replace(decimal, ".")
-        curr = curr.replace(",", ".")
-
-        if curr:
+        if curr := curr.replace(",", "."):
             try:
                 curro = float(curr)
                 curr = FixedPoint(curr, 20)
@@ -1245,18 +1226,12 @@ class FloatSpin(wx.PyControl):
         if font is None:
             font = wx.SystemSettings_GetFont(wx.SYS_DEFAULT_GUI_FONT)
 
-        if not self._textctrl:
-            return False
-
-        return self._textctrl.SetFont(font)
+        return self._textctrl.SetFont(font) if self._textctrl else False
 
     def GetFont(self):
         """Returns the underlying :class:`TextCtrl` font."""
 
-        if not self._textctrl:
-            return self.GetFont()
-
-        return self._textctrl.GetFont()
+        return self._textctrl.GetFont() if self._textctrl else self.GetFont()
 
     def GetMin(self):
         """Returns the minimum value for :class:`FloatSpin`. It can be a
@@ -1285,13 +1260,9 @@ class FloatSpin(wx.PyControl):
 
         if not self.HasRange():
             return True
-        if self._min is not None:
-            if float(value) < float(self._min):
-                return False
-        if self._max is not None:
-            if float(value) > float(self._max):
-                return False
-        return True
+        if self._min is not None and float(value) < float(self._min):
+            return False
+        return self._max is None or float(value) <= float(self._max)
 
     def GetTextCtrl(self):
         """Returns the underlying :class:`TextCtrl`."""
@@ -1540,10 +1511,7 @@ class FixedPoint(object):
             # want n such that n / 10**p = top * 2**e, or
             # n = top * 10**p * 2**e
             top = top * _tento(p)
-            if e >= 0:
-                n = top << e
-            else:
-                n = _roundquotient(top, 1 << -e)
+            n = top << e if e >= 0 else _roundquotient(top, 1 << -e)
             if value < 0:
                 n = -n
             self.n = n
@@ -1596,9 +1564,9 @@ class FixedPoint(object):
         try:
             p = int(precision)
         except Exception:
-            raise TypeError("precision not convertable to int: " + repr(precision))
+            raise TypeError(f"precision not convertable to int: {repr(precision)}")
         if p < 0:
-            raise ValueError("precision must be >= 0: " + repr(precision))
+            raise ValueError(f"precision must be >= 0: {repr(precision)}")
 
         if p > self.p:
             self.n = self.n * _tento(p - self.p)
@@ -1619,7 +1587,7 @@ class FixedPoint(object):
 
     def __repr__(self):
 
-        return "FixedPoint" + repr((str(self), self.p))
+        return f"FixedPoint{repr((str(self), self.p))}"
 
     def copy(self):
         """Create a copy of the current :class:`FixedPoint`."""
@@ -1657,10 +1625,7 @@ class FixedPoint(object):
         return _mkFP(-self.n, self.p)
 
     def __abs__(self):
-        if self.n >= 0:
-            return self.copy()
-        else:
-            return -self
+        return self.copy() if self.n >= 0 else -self
 
     def __add__(self, other):
         n1, n2, p = _norm(self, other)
@@ -1865,11 +1830,6 @@ def _string2exact(s):
         raise ValueError("can't parse as number: " + repr(s))
 
     exp = m.group("exp")
-    if exp is None:
-        exp = 0
-    else:
-        exp = int(exp)
-
     intpart = m.group("int")
     if intpart is None:
         intpart = "0"
@@ -1884,8 +1844,7 @@ def _string2exact(s):
     i, f = int(intpart), int(fracpart)
     nfrac = len(fracpart)
     i = i * _tento(nfrac) + f
-    exp = exp - nfrac
-
+    exp = (0 if exp is None else int(exp)) - nfrac
     if m.group("sign") == "-":
         i = -i
 
@@ -1904,9 +1863,10 @@ def get_all_keyboard_focusable_children(parent):
     else:
         for child in parent.Children:
             if child.Enabled and child.IsShownOnScreen():
-                if child.AcceptsFocusFromKeyboard():
-                    if not isinstance(child, wx.RadioButton) or child.Value:
-                        children.append(child)
+                if child.AcceptsFocusFromKeyboard() and (
+                    not isinstance(child, wx.RadioButton) or child.Value
+                ):
+                    children.append(child)
                 if child.Children:
                     children.extend(get_all_keyboard_focusable_children(child))
     return children

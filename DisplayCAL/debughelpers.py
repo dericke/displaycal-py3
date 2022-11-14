@@ -123,7 +123,7 @@ def handle_error(error, parent=None, silent=False, tb=True):
                 dlg.Destroy()
         except Exception as exception:
             traceback.print_exc()
-            print("Warning: handle_error():", str(exception))
+            print("Warning: handle_error():", exception)
 
 
 def print_callstack():

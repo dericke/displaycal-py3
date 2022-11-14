@@ -139,9 +139,7 @@ def cal_to_vcgt(cal, return_cgats=False):
     for n in entries:
         for i in range(3):
             vcgt.data[i].append(entries[n][i + 1] * 65535.0)
-    if return_cgats:
-        return vcgt, cal
-    return vcgt
+    return (vcgt, cal) if return_cgats else vcgt
 
 
 def can_update_cal(path):

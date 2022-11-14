@@ -16,9 +16,7 @@ def init(set_wx_locale=False):
     If set_wx_locale is True, set locale also for wxPython.
 
     """
-    langdirs = []
-    for dir_ in data_dirs:
-        langdirs.append(os.path.join(dir_, "lang"))
+    langdirs = [os.path.join(dir_, "lang") for dir_ in data_dirs]
     for langdir in langdirs:
         if os.path.exists(langdir) and os.path.isdir(langdir):
             try:
@@ -89,10 +87,10 @@ def getstr(id_str, strvars=None, lcode=None, default=None):
     if lcode in ldict and id_str in ldict[lcode]:
         lstr = ldict[lcode][id_str]
         if debug:
-            if id_str not in usage or not isinstance(usage[id_str], int):
-                usage[id_str] = 1
-            else:
+            if id_str in usage and isinstance(usage[id_str], int):
                 usage[id_str] += 1
+            else:
+                usage[id_str] = 1
         if strvars is not None:
             if not isinstance(strvars, (list, tuple)):
                 strvars = [strvars]
@@ -105,10 +103,7 @@ def getstr(id_str, strvars=None, lcode=None, default=None):
                         s = str(s)
                     elif not fmt[i].endswith("r"):
                         try:
-                            if fmt[i][-1] in "dioxX":
-                                s = int(s)
-                            else:
-                                s = float(s)
+                            s = int(s) if fmt[i][-1] in "dioxX" else float(s)
                         except (TypeError, ValueError):
                             s = 0
                     strvars[i] = s

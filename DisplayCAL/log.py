@@ -23,12 +23,7 @@ logging.raiseExceptions = 0
 logging._warnings_showwarning = warnings.showwarning
 
 
-if debug:
-    loglevel = logging.DEBUG
-else:
-    loglevel = logging.INFO
-
-
+loglevel = logging.DEBUG if debug else logging.INFO
 logger = None
 _logdir = None
 
@@ -68,11 +63,8 @@ logbuffer = EncodedFile(BytesIO(), "UTF-8", errors="replace")
 
 
 def wx_log(logwindow, msg):
-    if logwindow.IsShownOnScreen():
-        # Check if log buffer has been emptied or not.
-        # If it has, our log message is already included.
-        if logbuffer.tell():
-            logwindow.Log(msg)
+    if logwindow.IsShownOnScreen() and logbuffer.tell():
+        logwindow.Log(msg)
 
 
 class DummyLogger:
@@ -119,7 +111,7 @@ class Log(object):
         # imported at the point our showwarning() function calls log().
         # Check for presence of our wxfixes module and if it has an attribute
         # "wx", in which case wxPython has finished importing.
-        wxfixes = sys.modules.get("%s.wxfixes" % appname)
+        wxfixes = sys.modules.get(f"{appname}.wxfixes")
         # wxfixes = sys.modules.get("wxfixes")
         if (
             wxfixes
@@ -228,7 +220,7 @@ def get_file_logger(
             lockbasename = filename.replace(appname, "dispcalGUI")
         else:
             lockbasename = filename
-        lockfilepath = os.path.join(confighome, lockbasename + ".lock")
+        lockfilepath = os.path.join(confighome, f"{lockbasename}.lock")
         if os.path.isfile(lockfilepath):
             try:
                 with open(lockfilepath, "r") as lockfile:
@@ -250,7 +242,7 @@ def get_file_logger(
                         # the one not currently in use.
                         mtimes = {}
                         for filename in filenames:
-                            logfile = os.path.join(logdir, filename + ".log")
+                            logfile = os.path.join(logdir, f"{filename}.log")
                             if not os.path.isfile(logfile):
                                 mtimes[0] = filename
                                 continue
@@ -266,9 +258,7 @@ def get_file_logger(
                         if mtimes:
                             filename = mtimes[sorted(mtimes.keys())[0]]
         if is_main_process:
-            for lockfilepath in safe_glob(
-                os.path.join(confighome, lockbasename + ".mp-worker-*.lock")
-            ):
+            for lockfilepath in safe_glob(os.path.join(confighome, f"{lockbasename}.mp-worker-*.lock")):
                 try:
                     os.remove(lockfilepath)
                 except Exception:
@@ -294,7 +284,7 @@ def get_file_logger(
             when = "never"
             filename += ".mp-worker-%i" % process_num
             mode = "w"
-    logfile = os.path.join(logdir, filename + ".log")
+    logfile = os.path.join(logdir, f"{filename}.log")
     for handler in logger.handlers:
         if isinstance(
             handler, logging.FileHandler
@@ -334,10 +324,7 @@ def get_file_logger(
             dstNow = now[-1]
             dstThen = mtime[-1]
             if dstNow != dstThen:
-                if dstNow:
-                    addend = 3600
-                else:
-                    addend = -3600
+                addend = 3600 if dstNow else -3600
                 mtime = localtime(t + addend)
             if now[:3] > mtime[:3]:
                 # do rollover
@@ -370,7 +357,7 @@ def get_file_logger(
                     )
                 else:
                     result = []
-                    prefix = baseName + "."
+                    prefix = f"{baseName}."
                     plen = len(prefix)
                     for fileName in fileNames:
                         if fileName[:plen] == prefix:
@@ -423,7 +410,7 @@ def setup_logging(logdir, name=appname, ext=".py", backupCount=5, confighome=Non
             filename=name,
             confighome=confighome,
         )
-        if name == appname or name == "dispcalGUI":
+        if name in [appname, "dispcalGUI"]:
             streamhandler = logging.StreamHandler(logbuffer)
             streamformatter = logging.Formatter("%(asctime)s %(message)s")
             streamhandler.setFormatter(streamformatter)

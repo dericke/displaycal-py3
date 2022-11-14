@@ -165,8 +165,7 @@ def device_id_from_edid(
     # gnome-settings-daemon/plugins/color/gsd-color-state.c
     # and Edid::deviceId in colord-kde/colord-kded/Edid.cpp respectively
     if "hash" in edid:
-        device_id = device_ids.get(edid["hash"])
-        if device_id:
+        if device_id := device_ids.get(edid["hash"]):
             return device_id
         elif (
             sys.platform not in ("darwin", "win32")
@@ -191,8 +190,7 @@ def device_id_from_edid(
     if use_serial_32:
         edid_keys.append("serial_32")
     for name in edid_keys:
-        value = edid.get(name)
-        if value:
+        if value := edid.get(name):
             if name == "serial_32" and "serial_ascii" in edid:
                 # Only add numeric serial if no ascii serial
                 continue
@@ -214,9 +212,9 @@ def find(what, search):
         raise CDError("colord API not available")
     if not isinstance(search, list):
         search = [search]
-    method_name = "_".join(part for part in what.split("-"))
+    method_name = "_".join(what.split("-"))
     try:
-        return getattr(Colord, "find_" + method_name)(*search)
+        return getattr(Colord, f"find_{method_name}")(*search)
     except Exception as exception:
         if hasattr(exception, "get_dbus_name"):
             if exception.get_dbus_name() == "org.freedesktop.ColorManager.NotFound":
@@ -239,20 +237,21 @@ def get_default_profile(device_id):
     else:
         if properties.get("ProfilingInhibitors"):
             return None
-        profiles = properties.get("Profiles")
-        if profiles:
+        if profiles := properties.get("Profiles"):
             return profiles[0]
         else:
             raise CDError("Couldn't get default profile for device ID %r" % device_id)
 
 
 def get_devices_by_kind(kind):
-    if not isinstance(Colord, DBusObject):
-        return []
-    return [
-        Device(str(object_path))
-        for object_path in Colord.get_devices_by_kind(kind)
-    ]
+    return (
+        [
+            Device(str(object_path))
+            for object_path in Colord.get_devices_by_kind(kind)
+        ]
+        if isinstance(Colord, DBusObject)
+        else []
+    )
 
 
 def get_display_devices():
@@ -271,10 +270,10 @@ def get_display_device_ids():
 
 def get_object_path(search, object_type):
     """Get object path for profile or device ID"""
-    result = find(object_type + "-by-id", search)
-    if not result:
-        raise CDObjectNotFoundError("Could not find object path for %s" % search)
-    return result
+    if result := find(f"{object_type}-by-id", search):
+        return result
+    else:
+        raise CDObjectNotFoundError(f"Could not find object path for {search}")
 
 
 def install_profile(
@@ -299,7 +298,7 @@ def install_profile(
     if profile.ID == "\0" * 16:
         profile.calculateID()
         profile.fileName = None
-    profile_id = "icc-" + hexlify(profile.ID).decode()
+    profile_id = f"icc-{hexlify(profile.ID).decode()}"
 
     # Write profile to destination
     profile_installdir = os.path.dirname(profile_install_name)
@@ -389,13 +388,13 @@ def install_profile(
             # Give colord time to pick up the profile
             sleep(1)
 
-        if not cdprofile:
-            raise CDTimeout(
-                "Querying for profile %r returned no result for %s "
-                "secs" % (profile_id, timeout)
-            )
+    if not cdprofile:
+        raise CDTimeout(
+            "Querying for profile %r returned no result for %s "
+            "secs" % (profile_id, timeout)
+        )
 
-    errmsg = "Could not make profile %s default for device %s" % (profile_id, device_id)
+    errmsg = f"Could not make profile {profile_id} default for device {device_id}"
 
     if Colord and not isinstance(Colord, DBusObject):
         # Connect to profile
@@ -475,7 +474,7 @@ def quirk_manufacturer(manufacturer):
     # Get rid of suffixes
     for suffix in quirk_cache["suffixes"]:
         if manufacturer.endswith(suffix):
-            manufacturer = manufacturer[0: len(manufacturer) - len(suffix)]
+            manufacturer = manufacturer[:len(manufacturer) - len(suffix)]
 
     manufacturer = manufacturer.rstrip()
 

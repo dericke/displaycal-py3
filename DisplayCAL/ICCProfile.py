@@ -24,18 +24,17 @@ from DisplayCAL.util_dict import dict_sort
 
 if sys.platform == "win32":
     import winreg
-else:
-    import subprocess as sp
-
-    if sys.platform == "darwin":
-        from platform import mac_ver
-
-if sys.platform == "win32":
     try:
         import win32api
         import win32gui
     except ImportError:
         pass
+
+else:
+    import subprocess as sp
+
+    if sys.platform == "darwin":
+        from platform import mac_ver
 
 try:
     from DisplayCAL import colord
@@ -470,7 +469,7 @@ def create_RGB_A2B_XYZ(input_curves, clut, logfn=print):
 
     fwd = []
     bwd = []
-    for i, input_curve in enumerate(input_curves):
+    for input_curve in input_curves:
         if isinstance(input_curve, (tuple, list)):
             linear = [v / (len(input_curve) - 1.0) for v in range(len(input_curve))]
             fwd.append(colormath.Interp(linear, input_curve, use_numpy=True))
@@ -483,6 +482,7 @@ def create_RGB_A2B_XYZ(input_curves, clut, logfn=print):
         itable.output.append([0, 65535])
 
     logfn("cLUT input curve segments:", clutres)
+    entries = 2049
     for i in range(3):
         maxi = bwd[i](white_XYZ[1])
         segment = 1.0 / (clutres - 1.0) * maxi
@@ -520,7 +520,6 @@ def create_RGB_A2B_XYZ(input_curves, clut, logfn=print):
             xp.append(out)
         # Fill input curves from interpolated values
         interp = colormath.Interp(xp, list(range(steps)), use_numpy=True)
-        entries = 2049
         threshold = bwd[i](pprevpow)
         k = None
         for j in range(entries):
@@ -540,11 +539,11 @@ def create_RGB_A2B_XYZ(input_curves, clut, logfn=print):
     clut = list(clut)
     itable.clut = []
     step = 1.0 / (clutres - 1.0)
-    for R in range(clutres):
-        for G in range(clutres):
+    for _ in range(clutres):
+        for _ in range(clutres):
             row = list(clut.pop(0))
             itable.clut.append([])
-            for B in range(clutres):
+            for _ in range(clutres):
                 X, Y, Z = row.pop(0)
                 itable.clut[-1].append(
                     [max(v / white_XYZ[1] * 32768, 0) for v in (X, Y, Z)]
@@ -651,7 +650,7 @@ def create_synthetic_clut_profile(
             itable.input[i].append(interp(v) / maxv * 65535)
 
     # Fill remaining input curves from first input curve and create output curves
-    for i in range(3):
+    for _ in range(3):
         if len(itable.input) < 3:
             itable.input.append(itable.input[0])
             otable.input.append(otable.input[0])

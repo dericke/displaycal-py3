@@ -359,10 +359,11 @@ def app_update_check(parent=None, silent=False, snapshot=False, argyll=False):
         parent,
         DOMAIN,
         "GET",
-        "/" + version_file,
+        f"/{version_file}",
         failure_msg=lang.getstr("update_check.fail"),
         silent=silent,
     )
+
     if resp is False:
         if silent:
             # Check if we need to run instrument setup
@@ -392,7 +393,7 @@ def app_update_check(parent=None, silent=False, snapshot=False, argyll=False):
         APP_IS_UPTODATE = newversion_tuple <= curversion_tuple
     if newversion_tuple > curversion_tuple:
         # Get changelog
-        resp = http_request(parent, DOMAIN, "GET", "/" + chglog_file, silent=True)
+        resp = http_request(parent, DOMAIN, "GET", f"/{chglog_file}", silent=True)
         chglog = None
         if resp:
             readme = str(resp.read())
@@ -455,8 +456,9 @@ def app_update_check(parent=None, silent=False, snapshot=False, argyll=False):
         wx.CallAfter(
             app_uptodate,
             parent,
-            "ArgyllCMS" if not globals().get("APP_IS_UPTODATE") else appname,
+            appname if globals().get("APP_IS_UPTODATE") else "ArgyllCMS",
         )
+
     else:
         print(lang.getstr("update_check.uptodate", "ArgyllCMS"))
         # Check if we need to run instrument setup

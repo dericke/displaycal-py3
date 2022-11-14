@@ -2,6 +2,7 @@
 """Runtime configuration and user settings parser
 """
 
+
 import configparser
 from decimal import Decimal
 import locale
@@ -71,13 +72,11 @@ pyfile = (
     or os.path.join(os.path.dirname(__file__), "main.py")
 )
 pypath = exe if isexe else os.path.abspath(pyfile)
-# Mac OS X: isapp should only be true for standalone, not 0install
-isapp = (
+if isapp := (
     sys.platform == "darwin"
     and exe.split(os.path.sep)[-3:-1] == ["Contents", "MacOS"]
     and os.path.exists(os.path.join(exedir, "..", "Resources", "xrc"))
-)
-if isapp:
+):
     pyname, pyext = os.path.splitext(exe.split(os.path.sep)[-4])
     pydir = os.path.normpath(os.path.join(exedir, "..", "Resources"))
 else:
@@ -120,7 +119,6 @@ if sys.platform == "win32":
         # (e.g. Scripts\displaycal-apply-profiles)
         data_dirs.append(exedir)
     script_ext = ".cmd"
-    scale_adjustment_factor = 1.0
     config_sys = os.path.join(commonappdata[0], appbasename)
     confighome = os.path.join(appdata, appbasename)
     logdir = os.path.join(datahome, "logs")
@@ -136,7 +134,6 @@ else:
     if sys.platform == "darwin":
         script_ext = ".command"
         mac_create_app = True
-        scale_adjustment_factor = 1.0
         config_sys = os.path.join(prefs, appbasename)
         confighome = os.path.join(prefs_home, appbasename)
         logdir = os.path.join(expanduseru("~"), "Library", "Logs", appbasename)
@@ -146,7 +143,6 @@ else:
         data_dirs.append(os.path.join(commonappdata[0], appbasename))
     else:
         script_ext = ".sh"
-        scale_adjustment_factor = 1.0
         config_sys = os.path.join(xdg_config_dir_default, appbasename)
         confighome = os.path.join(xdg_config_home, appbasename)
         logdir = os.path.join(datahome, "logs")
@@ -169,6 +165,7 @@ else:
     exe_ext = ""
     profile_ext = ".icc"
 
+scale_adjustment_factor = 1.0
 storage = os.path.join(datahome, "storage")
 
 resfiles = [
@@ -221,10 +218,7 @@ virtual_displays = untethered_displays + ("madVR$",)
 def is_special_display(display=None, tests=virtual_displays):
     if not isinstance(display, str):
         display = get_display_name(display)
-    for test in tests:
-        if re.match(test, display):
-            return True
-    return False
+    return any(re.match(test, display) for test in tests)
 
 
 def is_uncalibratable_display(display=None):
@@ -248,14 +242,13 @@ def is_virtual_display(display=None):
 
 
 def check_3dlut_format(devicename):
-    if get_display_name(None, True) == devicename:
-        if devicename == "Prisma":
-            return (
-                getcfg("3dlut.format") == "3dl"
-                and getcfg("3dlut.size") == 17
-                and getcfg("3dlut.bitdepth.input") == 10
-                and getcfg("3dlut.bitdepth.output") == 12
-            )
+    if get_display_name(None, True) == devicename == "Prisma":
+        return (
+            getcfg("3dlut.format") == "3dl"
+            and getcfg("3dlut.size") == 17
+            and getcfg("3dlut.bitdepth.input") == 10
+            and getcfg("3dlut.bitdepth.output") == 12
+        )
 
 
 def getbitmap(name, display_missing_icon=True, scale=True, use_mask=False):
